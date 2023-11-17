@@ -3,16 +3,16 @@ from micropython import const
 
 class MCP7940:
     """
-        Example usage:
+    Example usage:
 
-            # Read time
-            mcp = MCP7940(i2c)
-            time = mcp.time # Read time from MCP7940
-            is_leap_year = mcp.is_leap_year() # Is the year in the MCP7940 a leap year?
+        # Read time
+        mcp = MCP7940(i2c)
+        time = mcp.time # Read time from MCP7940
+        is_leap_year = mcp.is_leap_year() # Is the year in the MCP7940 a leap year?
 
-            # Set time
-            ntptime.settime() # Set system time from NTP
-            mcp.time = utime.localtime() # Set the MCP7940 with the system time
+        # Set time
+        ntptime.settime() # Set system time from NTP
+        mcp.time = utime.localtime() # Set the MCP7940 with the system time
     """
 
     ADDRESS = const(0x6F)
@@ -40,8 +40,8 @@ class MCP7940:
         return self._read_bit(MCP7940.RTCWKDAY, MCP7940.VBATEN)
 
     def _set_bit(self, register, bit, value):
-        """ Set only a single bit in a register. To do so, need to read
-            the current state of the register and modify just the one bit.
+        """Set only a single bit in a register. To do so, need to read
+        the current state of the register and modify just the one bit.
         """
         mask = 1 << bit
         current = self._i2c.readfrom_mem(MCP7940.ADDRESS, register, 1)
@@ -59,10 +59,10 @@ class MCP7940:
     @time.setter
     def time(self, t):
         """
-            >>> import time
-            >>> time.localtime()
-            (2019, 6, 3, 13, 12, 44, 0, 154)
-            # 1:12:44pm on Monday (0) the 3 Jun 2019 (154th day of the year)
+        >>> import time
+        >>> time.localtime()
+        (2019, 6, 3, 13, 12, 44, 0, 154)
+        # 1:12:44pm on Monday (0) the 3 Jun 2019 (154th day of the year)
         """
         year, month, date, hours, minutes, seconds, weekday, yearday = t
         # Reorder
@@ -72,37 +72,50 @@ class MCP7940:
 
         # Add VBATEN (battery enable) bit
 
-        print(
-            "{}/{}/{} {}:{}:{} (day={})".format(
-                time_reg[6],
-                time_reg[5],
-                time_reg[4],
-                time_reg[2],
-                time_reg[1],
-                time_reg[0],
-                time_reg[3],
-            )
-        )
-        print(time_reg)
+        # print(
+        #     "{}/{}/{} {}:{}:{} (day={})".format(
+        #         time_reg[6],
+        #         time_reg[5],
+        #         time_reg[4],
+        #         time_reg[2],
+        #         time_reg[1],
+        #         time_reg[0],
+        #         time_reg[3],
+        #     )
+        # )
+        # print(time_reg)
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F, 0xFF)
         # t = bytes([MCP7940.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)])
-        t = [(MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        t = [
+            (MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)
+        ]
         # Note that some fields will be overwritten that are important!
         # fixme!
-        print(t)
+        # print(t)
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x00, bytes(t))
-        
+
     @property
     def alarm1(self):
         return self._get_time(start_reg=0x0A)
 
     @alarm1.setter
     def alarm1(self, t):
-        _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        (
+            _,
+            month,
+            date,
+            hours,
+            minutes,
+            seconds,
+            weekday,
+            _,
+        ) = t  # Don't need year or yearday
         # Reorder
         time_reg = [seconds, minutes, hours, weekday + 1, date, month]
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F)  # No year field for alarms
-        t = [(MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        t = [
+            (MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)
+        ]
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x0A, bytes(t))
 
     @property
@@ -111,15 +124,26 @@ class MCP7940:
 
     @alarm2.setter
     def alarm2(self, t):
-        _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        (
+            _,
+            month,
+            date,
+            hours,
+            minutes,
+            seconds,
+            weekday,
+            _,
+        ) = t  # Don't need year or yearday
         # Reorder
         time_reg = [seconds, minutes, hours, weekday + 1, date, month]
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F)  # No year field for alarms
-        t = [(MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        t = [
+            (MCP7940.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)
+        ]
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x11, bytes(t))
 
     def bcd_to_int(bcd):
-        """ Expects a byte encoded wtih 2x 4bit BCD values. """
+        """Expects a byte encoded wtih 2x 4bit BCD values."""
         # Alternative using conversions: int(str(hex(bcd))[2:])
         return (bcd & 0xF) + (bcd >> 4) * 10
 
@@ -127,17 +151,19 @@ class MCP7940:
         return (i // 10 << 4) + (i % 10)
 
     def is_leap_year(year):
-        """ https://stackoverflow.com/questions/725098/leap-year-calculation """
+        """https://stackoverflow.com/questions/725098/leap-year-calculation"""
         if (year % 4 == 0 and year % 100 != 0) or year % 400 == 0:
             return True
         return False
 
-    def _get_time(self, start_reg = 0x00):
+    def _get_time(self, start_reg=0x00):
         num_registers = 7 if start_reg == 0x00 else 6
-        time_reg = self._i2c.readfrom_mem(MCP7940.ADDRESS, start_reg, num_registers)  # Reading too much here for alarms
+        time_reg = self._i2c.readfrom_mem(
+            MCP7940.ADDRESS, start_reg, num_registers
+        )  # Reading too much here for alarms
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F, 0xFF)[:num_registers]
-        print(time_reg)
-        print(reg_filter)
+        # print(time_reg)
+        # print(reg_filter)
         t = [MCP7940.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
         # Reorder
         t2 = (t[5], t[4], t[2], t[1], t[0], t[3] - 1)
@@ -146,7 +172,7 @@ class MCP7940:
         # year, month, date, hours, minutes, seconds, weekday, yearday = t
         # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
 
-        print(t)
+        # print(t)
         return t
 
     class Data:
@@ -154,22 +180,28 @@ class MCP7940:
             self._i2c = i2c
             self._address = address
             self._memory_start = 0x20
-            #self._memory_start = const(0x20)
+            # self._memory_start = const(0x20)
 
         def __getitem__(self, key):
-            get_byte = lambda x: self._i2c.readfrom_mem(self._address, x + self._memory_start, 1)(x)
+            get_byte = lambda x: self._i2c.readfrom_mem(
+                self._address, x + self._memory_start, 1
+            )(x)
             if type(key) is int:
-                print('key: {}'.format(key))
+                print("key: {}".format(key))
                 return get_byte(key)
             elif type(key) is slice:
-                print('start: {} stop: {} step: {}'.format(key.start, key.stop, key.step))
+                print(
+                    "start: {} stop: {} step: {}".format(key.start, key.stop, key.step)
+                )
                 # fixme: Could be more efficient if we check for a contiguous block
                 # Loop over range(64)[slice]
                 return [get_byte(i) for i in range(64)[key]]
 
         def __setitem__(self, key, value):
             if type(key) is int:
-                print('key: {}'.format(key))
+                print("key: {}".format(key))
             elif type(key) is slice:
-                print('start: {} stop: {} step: {}'.format(key.start, key.stop, key.step))
+                print(
+                    "start: {} stop: {} step: {}".format(key.start, key.stop, key.step)
+                )
             print(value)
