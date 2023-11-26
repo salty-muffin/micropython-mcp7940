@@ -142,15 +142,18 @@ class MCP7940:
         ]
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x11, bytes(t))
 
-    def bcd_to_int(bcd):
+    @classmethod
+    def bcd_to_int(cls, bcd):
         """Expects a byte encoded wtih 2x 4bit BCD values."""
         # Alternative using conversions: int(str(hex(bcd))[2:])
         return (bcd & 0xF) + (bcd >> 4) * 10
 
-    def int_to_bcd(i):
+    @classmethod
+    def int_to_bcd(cls, i):
         return (i // 10 << 4) + (i % 10)
 
-    def is_leap_year(year):
+    @classmethod
+    def is_leap_year(cls, year):
         """https://stackoverflow.com/questions/725098/leap-year-calculation"""
         if (year % 4 == 0 and year % 100 != 0) or year % 400 == 0:
             return True
