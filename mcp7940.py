@@ -1,3 +1,5 @@
+"""incorporated fixes from the circuitpython port of this library: https://github.com/PaulskPt/Circuitpython_MCP7940"""
+
 from micropython import const
 
 
@@ -17,24 +19,32 @@ class MCP7940:
 
     ADDRESS = const(0x6F)
     RTCSEC = 0x00  # RTC seconds register
-    ST = 7  # Status bit
     RTCWKDAY = 0x03  # RTC Weekday register
+    ST = 7  # Status bit
     VBATEN = 3  # External battery backup supply enable bit
 
-    def __init__(self, i2c, status=True, battery_enabled=True):
+    def __init__(self, i2c, battery_enabled=True):
         self._i2c = i2c
+        if battery_enabled:
+            self.battery_backup_enable(1)
+        else:
+            self.battery_backup_enable(0)
+        self._battery_enabled = battery_enabled
+        self._running = False
 
     def start(self):
         self._set_bit(MCP7940.RTCSEC, MCP7940.ST, 1)
+        self._running = True
 
     def stop(self):
         self._set_bit(MCP7940.RTCSEC, MCP7940.ST, 0)
+        self._running = False
 
     def is_started(self):
         return self._read_bit(MCP7940.RTCSEC, MCP7940.ST)
 
     def battery_backup_enable(self, enable):
-        self._set_bit(MCP7940.RTCWKDAY, MCP7940.VBATEN, enable)
+        self._set_bit(MCP7940.RTCWKDAY, MCP7940.VBATEN, int(enable))
 
     def is_battery_backup_enabled(self):
         return self._read_bit(MCP7940.RTCWKDAY, MCP7940.VBATEN)
@@ -52,6 +62,16 @@ class MCP7940:
         register_val = self._i2c.readfrom_mem(MCP7940.ADDRESS, register, 1)
         return (register_val[0] & (1 << bit)) >> bit
 
+    def set_trim(self, value, corse=False):
+        self._set_bit(0x07, 2, int(corse))
+        sign = 1
+        if value < 0:
+            sign = 0
+            value *= -1
+        self._i2c.writeto_mem(
+            MCP7940.ADDRESS, 0x00, bytes([value & 0b1111111 | sign << 7])
+        )
+
     @property
     def time(self):
         return self._get_time()
@@ -68,22 +88,6 @@ class MCP7940:
         # Reorder
         time_reg = [seconds, minutes, hours, weekday + 1, date, month, year % 100]
 
-        # Add ST (status) bit
-
-        # Add VBATEN (battery enable) bit
-
-        # print(
-        #     "{}/{}/{} {}:{}:{} (day={})".format(
-        #         time_reg[6],
-        #         time_reg[5],
-        #         time_reg[4],
-        #         time_reg[2],
-        #         time_reg[1],
-        #         time_reg[0],
-        #         time_reg[3],
-        #     )
-        # )
-        # print(time_reg)
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F, 0xFF)
         # t = bytes([MCP7940.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)])
         t = [
@@ -91,8 +95,15 @@ class MCP7940:
         ]
         # Note that some fields will be overwritten that are important!
         # fixme!
-        # print(t)
+        if self._running:
+            self.stop()
+
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x00, bytes(t))
+
+        self.battery_backup_enable(int(self._battery_enabled))
+
+        if self._running:
+            self.start()
 
     @property
     def alarm1(self):
@@ -165,8 +176,6 @@ class MCP7940:
             MCP7940.ADDRESS, start_reg, num_registers
         )  # Reading too much here for alarms
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F, 0xFF)[:num_registers]
-        # print(time_reg)
-        # print(reg_filter)
         t = [MCP7940.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
         # Reorder
         t2 = (t[5], t[4], t[2], t[1], t[0], t[3] - 1)
@@ -175,36 +184,4 @@ class MCP7940:
         # year, month, date, hours, minutes, seconds, weekday, yearday = t
         # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
 
-        # print(t)
         return t
-
-    class Data:
-        def __init__(self, i2c, address):
-            self._i2c = i2c
-            self._address = address
-            self._memory_start = 0x20
-            # self._memory_start = const(0x20)
-
-        def __getitem__(self, key):
-            get_byte = lambda x: self._i2c.readfrom_mem(
-                self._address, x + self._memory_start, 1
-            )(x)
-            if type(key) is int:
-                print("key: {}".format(key))
-                return get_byte(key)
-            elif type(key) is slice:
-                print(
-                    "start: {} stop: {} step: {}".format(key.start, key.stop, key.step)
-                )
-                # fixme: Could be more efficient if we check for a contiguous block
-                # Loop over range(64)[slice]
-                return [get_byte(i) for i in range(64)[key]]
-
-        def __setitem__(self, key, value):
-            if type(key) is int:
-                print("key: {}".format(key))
-            elif type(key) is slice:
-                print(
-                    "start: {} stop: {} step: {}".format(key.start, key.stop, key.step)
-                )
-            print(value)
