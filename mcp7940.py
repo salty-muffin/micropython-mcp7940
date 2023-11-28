@@ -95,14 +95,15 @@ class MCP7940:
         ]
         # Note that some fields will be overwritten that are important!
         # fixme!
-        if self._running:
+        running = self._running
+        if running:
             self.stop()
 
         self._i2c.writeto_mem(MCP7940.ADDRESS, 0x00, bytes(t))
 
         self.battery_backup_enable(int(self._battery_enabled))
 
-        if self._running:
+        if running:
             self.start()
 
     @property
