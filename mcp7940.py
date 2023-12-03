@@ -69,8 +69,16 @@ class MCP7940:
             sign = 0
             value *= -1
         self._i2c.writeto_mem(
-            MCP7940.ADDRESS, 0x00, bytes([value & 0b1111111 | sign << 7])
+            MCP7940.ADDRESS, 0x08, bytes([value & 0b1111111 | sign << 7])
         )
+
+    def get_trim(self):
+        trim = self._i2c.readfrom_mem(MCP7940.ADDRESS, 0x08, 1)[0]
+        value = trim & 0b1111111
+        if (trim & (1 << 7)) >> 7:
+            return value
+        else:
+            return -value
 
     @property
     def time(self):
